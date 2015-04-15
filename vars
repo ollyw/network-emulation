@@ -1,0 +1,57 @@
+# Define the sources of the binaries to be used (should not usually be changed)
+iptb=/sbin/iptables
+ipvs=/sbin/ipvsadm
+
+# The network interfaces used for routing/load balancing
+in_if=eth0
+out_if=eth1
+
+# Load balanced port
+lb_port_1=80
+lb_port_2=5222
+lb_port_3=8080
+
+# Load balanced source ip address (automatically configured)
+lb_dnat_ip=`ip addr show $in_if | grep "inet " | awk -F" " '{ print $2 }' | awk -F"/" '{ print $1 }'`
+
+# Load balanced destination ip address (automatically configured)
+lb_snat_ip=`ip addr show $out_if | grep "inet " | awk -F" " '{ print $2 }' | awk -F"/" '{ print $1 }'`
+
+# List of ip addresses to load balance. Currently a maximum of three. Comment out unused addresses with a '#'
+lb_pool_ip1=10.10.8.102
+lb_pool_ip2=10.10.8.105
+#lb_pool_ip3=10.10.8.27
+
+# Max connections per host (zero is unlimited)
+lb_max_conns_host_port_1=15000
+lb_max_conns_host_port_2=15000
+lb_max_conns_host_port_3=15000
+
+# The length of connection 'stickness'. Zero turns off stickness 
+lb_port_1_persistence_timeout=0
+lb_port_2_persistence_timeout=0
+lb_port_3_persistence_timeout=9999
+
+# TCP/TCP fin timeouts for connections
+lb_timeout_tcp=900
+lb_timeout_tcpfin=60
+
+# N.B. Net Emulation Settings below only apply to the load balanced traffic,
+# not general routed traffic. Therefore testing delay with a ping is futile
+# unless load balancing the ping port (port number zero).
+
+# Rate at which traffic should be limited (note Mbit is Megabits, NOT megabytes)
+netem_rate=50Mbit
+
+# Delay to be introduced into the packets destined for the Load Balanced port
+delay=20ms
+
+# The variation of the delay. e.g. 50ms delay, with 25ms variation could be 25-75ms
+delay_var=5ms
+
+# The distribution of the variation of the delay. See netem docs for details
+delay_percentdist=50%
+
+# Percentage of network traffic which is subject to packet loss/corruption
+loss=0%
+corrupt=0%

@@ -1,0 +1,179 @@
+#!/bin/bash
+
+source ./vars
+
+# CONFIRM forwarding enabled
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
+# Raise the number of connections that can be tracked because it is possible to exhaust them easily
+# The first to settings are legacy, I think
+echo 196608 > /proc/sys/net/ipv4/netfilter/ip_conntrack_max
+echo 196608 > /proc/sys/net/nf_conntrack_max
+# This is the real setting
+echo 196608 > /proc/sys/net/netfilter/nf_conntrack_max
+
+# Display interfaces
+echo In Interface is:     $in_if
+echo Out Interface is:    $out_if
+echo Load Balancer DNAT IP is: $lb_dnat_ip - DNS entry for "mslnp" should be set to this IP
+echo Load Balancer SNAT IP is: $lb_snat_ip - All connection to the server to come from this IP
+
+# FLUSH EM ALL 
+echo Flushing ALL Iptables
+$iptb -F 
+$iptb -F -t nat
+$iptb -F -t mangle
+
+# SNAT FOR RETURN TRAFFIC (termination trix-if necessary)
+#$iptb -t nat -A POSTROUTING -o $out_if -j SNAT --to-source $lb_snat_ip 
+#$iptb -t nat -A POSTROUTING -o $in_if -j LOG
+$iptb -t nat -A POSTROUTING -o $in_if -j MASQUERADE 
+#echo SNAT Traffic out $out_if to $lb_snat_ip
+
+#$iptb -A FORWARD -o $out_if -j LOG
+
+# MARK the PACKETS
+if [ -n "$lb_pool_ip1" ]; then
+if [ -n "$lb_port_1" ]; then
+$iptb -A FORWARD -t mangle -o $out_if -p tcp -d $lb_pool_ip1/32 --dport $lb_port_1 -j MARK --set-mark=1
+fi
+if [ -n "$lb_port_2" ]; then
+$iptb -A FORWARD -t mangle -o $out_if -p tcp -d $lb_pool_ip1/32 --dport $lb_port_2 -j MARK --set-mark=1
+fi
+if [ -n "$lb_port_3" ]; then
+$iptb -A FORWARD -t mangle -o $out_if -p tcp -d $lb_pool_ip1/32 --dport $lb_port_3 -j MARK --set-mark=1
+fi
+fi
+
+if [ -n "$lb_pool_ip2" ]; then
+if [ -n "$lb_port_1" ]; then
+$iptb -A FORWARD -t mangle -o $out_if -p tcp -d $lb_pool_ip2/32 --dport $lb_port_1 -j MARK --set-mark=1
+fi
+if [ -n "$lb_port_2" ]; then
+$iptb -A FORWARD -t mangle -o $out_if -p tcp -d $lb_pool_ip2/32 --dport $lb_port_2 -j MARK --set-mark=1
+fi
+if [ -n "$lb_port_3" ]; then
+$iptb -A FORWARD -t mangle -o $out_if -p tcp -d $lb_pool_ip2/32 --dport $lb_port_3 -j MARK --set-mark=1
+fi
+fi
+
+if [ -n "$lb_pool_ip3" ]; then
+if [ -n "$lb_port_1" ]; then
+$iptb -A FORWARD -t mangle -o $out_if -p tcp -d $lb_pool_ip3/32 --dport $lb_port_1 -j MARK --set-mark=1
+fi
+if [ -n "$lb_port_2" ]; then
+$iptb -A FORWARD -t mangle -o $out_if -p tcp -d $lb_pool_ip3/32 --dport $lb_port_2 -j MARK --set-mark=1
+fi
+if [ -n "$lb_port_3" ]; then
+$iptb -A FORWARD -t mangle -o $out_if -p tcp -d $lb_pool_ip3/32 --dport $lb_port_3 -j MARK --set-mark=1
+fi
+fi
+
+
+if [ -n "$lb_pool_ip1" ]; then
+if [ -n "$lb_port_1" ]; then
+$iptb -A FORWARD -t mangle -p tcp -o $in_if -s $lb_pool_ip1/32 --sport $lb_port_1 -j MARK --set-mark=2
+fi
+if [ -n "$lb_port_2" ]; then
+$iptb -A FORWARD -t mangle -p tcp -o $in_if -s $lb_pool_ip1/32 --sport $lb_port_2 -j MARK --set-mark=2
+fi
+if [ -n "$lb_port_3" ]; then
+$iptb -A FORWARD -t mangle -p tcp -o $in_if -s $lb_pool_ip1/32 --sport $lb_port_3 -j MARK --set-mark=2
+fi
+fi
+
+
+if [ -n "$lb_pool_ip2" ]; then
+if [ -n "$lb_port_1" ]; then
+$iptb -A FORWARD -t mangle -p tcp -o $in_if -s $lb_pool_ip2/32 --sport $lb_port_1 -j MARK --set-mark=2
+fi
+if [ -n "$lb_port_2" ]; then
+$iptb -A FORWARD -t mangle -p tcp -o $in_if -s $lb_pool_ip2/32 --sport $lb_port_2 -j MARK --set-mark=2
+fi
+if [ -n "$lb_port_3" ]; then
+$iptb -A FORWARD -t mangle -p tcp -o $in_if -s $lb_pool_ip2/32 --sport $lb_port_3 -j MARK --set-mark=2
+fi
+fi
+
+
+if [ -n "$lb_pool_ip3" ]; then
+if [ -n "$lb_port_1" ]; then
+$iptb -A FORWARD -t mangle -p tcp -o $in_if -s $lb_pool_ip3/32 --sport $lb_port_1 -j MARK --set-mark=2
+fi
+if [ -n "$lb_port_2" ]; then
+$iptb -A FORWARD -t mangle -p tcp -o $in_if -s $lb_pool_ip3/32 --sport $lb_port_2 -j MARK --set-mark=2
+fi
+if [ -n "$lb_port_3" ]; then
+$iptb -A FORWARD -t mangle -p tcp -o $in_if -s $lb_pool_ip3/32 --sport $lb_port_3 -j MARK --set-mark=2
+fi
+fi
+
+if [ $lb_port_1_persistence_timeout -ne "0" ]; then
+persistence_args_port_1=-p\ $lb_port_1_persistence_timeout
+fi
+
+if [ $lb_port_2_persistence_timeout -ne "0" ]; then
+persistence_args_port_2=-p\ $lb_port_2_persistence_timeout
+fi
+
+if [ $lb_port_3_persistence_timeout -ne "0" ]; then
+persistence_args_port_3=-p\ $lb_port_3_persistence_timeout
+fi
+
+# Add Load Balancing through ipvsadm
+$ipvs -C
+$ipvs -A -t $lb_dnat_ip:$lb_port_1 -s wrr $persistence_args_port_1
+$ipvs -A -t $lb_dnat_ip:$lb_port_2 -s wrr $persistence_args_port_2
+$ipvs -A -t $lb_dnat_ip:$lb_port_3 -s wrr $persistence_args_port_3
+$ipvs --set $lb_timeout_tcp $lb_timeout_tcpfin 300
+
+echo Added $lb_dnat_ip as the Virtual IP for Load Balancing - port $lb_port_1 and $lb_port_2 ONLY
+
+if [ -n "$lb_pool_ip1" ]; then
+if [ -n "$lb_port_1" ]; then
+$ipvs -a -t $lb_dnat_ip:$lb_port_1 -r $lb_pool_ip1:$lb_port_1 -m --u-threshold=$lb_max_conns_host_port_1
+echo Adding $lb_pool_ip1 to $lb_dnat_ip:$lb_port_1 Virtual Server Pool
+fi
+if [ -n "$lb_port_2" ]; then
+$ipvs -a -t $lb_dnat_ip:$lb_port_2 -r $lb_pool_ip1:$lb_port_2 -m --u-threshold=$lb_max_conns_host_port_2 
+echo Adding $lb_pool_ip1 to $lb_dnat_ip:$lb_port_2 Virtual Server Pool
+fi
+if [ -n "$lb_port_3" ]; then
+$ipvs -a -t $lb_dnat_ip:$lb_port_3 -r $lb_pool_ip1:$lb_port_3 -m --u-threshold=$lb_max_conns_host_port_3 
+echo Adding $lb_pool_ip1 to $lb_dnat_ip:$lb_port_3 Virtual Server Pool
+fi
+fi
+
+if [ -n "$lb_pool_ip2" ]; then
+if [ -n "$lb_port_1" ]; then
+$ipvs -a -t $lb_dnat_ip:$lb_port_1 -r $lb_pool_ip2:$lb_port_1 -m --u-threshold=$lb_max_conns_host_port_1
+echo Adding $lb_pool_ip2 to $lb_dnat_ip:$lb_port_1 Virtual Server Pool
+fi
+if [ -n "$lb_port_2" ]; then
+$ipvs -a -t $lb_dnat_ip:$lb_port_2 -r $lb_pool_ip2:$lb_port_2 -m --u-threshold=$lb_max_conns_host_port_2
+echo Adding $lb_pool_ip2 to $lb_dnat_ip:$lb_port_2 Virtual Server Pool
+fi
+if [ -n "$lb_port_3" ]; then
+$ipvs -a -t $lb_dnat_ip:$lb_port_3 -r $lb_pool_ip2:$lb_port_3 -m --u-threshold=$lb_max_conns_host_port_3
+echo Adding $lb_pool_ip2 to $lb_dnat_ip:$lb_port_3 Virtual Server Pool
+fi
+fi
+
+if [ -n "$lb_pool_ip3" ]; then
+if [ -n "$lb_port_1" ]; then
+$ipvs -a -t $lb_dnat_ip:$lb_port_1 -r $lb_pool_ip3:$lb_port_1 -m --u-threshold=$lb_max_conns_host_port_1
+echo Adding $lb_pool_ip3 to $lb_dnat_ip:$lb_port_1 Virtual Server Pool
+fi
+if [ -n "$lb_port_2" ]; then
+$ipvs -a -t $lb_dnat_ip:$lb_port_2 -r $lb_pool_ip3:$lb_port_2 -m --u-threshold=$lb_max_conns_host_port_2
+echo Adding $lb_pool_ip3 to $lb_dnat_ip:$lb_port_2 Virtual Server Pool
+fi
+if [ -n "$lb_port_3" ]; then
+$ipvs -a -t $lb_dnat_ip:$lb_port_3 -r $lb_pool_ip3:$lb_port_3 -m --u-threshold=$lb_max_conns_host_port_3
+echo Adding $lb_pool_ip3 to $lb_dnat_ip:$lb_port_3 Virtual Server Pool
+fi
+fi
+
+$iptb -nvL OUTPUT -t mangle
+$iptb -nvL FORWARD -t mangle
+$ipvs -l -n

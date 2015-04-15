@@ -1,0 +1,25 @@
+#!/bin/bash
+
+source ./vars
+
+# CONFIRM forwarding enabled
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
+# Display interfaces
+echo In Interface is:     $in_if
+echo Out Interface is:    $out_if
+echo Load Balancer DNAT IP is: $lb_dnat_ip - DNS entry for "mslnp" should be set to this IP
+echo Load Balancer SNAT IP is: $lb_snat_ip - All connection to the server to come from this IP
+
+# FLUSH EM ALL 
+echo Flushing ALL Iptables
+$iptb -F 
+$iptb -F -t nat
+$iptb -F -t mangle
+
+# SNAT FOR RETURN TRAFFIC (termination trix-if necessary)
+#$iptb -t nat -A POSTROUTING -o $out_if -j SNAT --to-source $lb_snat_ip 
+#$iptb -t nat -A POSTROUTING -o $in_if -j MASQUERADE 
+#echo SNAT Traffic out $out_if to $lb_snat_ip
+
+ipvsadm --clear
